@@ -54,6 +54,8 @@ namespace ServiceStack.Text.Common
 		   IDictionary<string, SetPropertyDelegate> setterMap,
 		   IDictionary<string, ParseStringDelegate> parseStringFnMap)
 		{
+            if (strType == null) return null;
+
 			var index = 0;
 
 			if (!Serializer.EatMapStartChar(strType, ref index))
