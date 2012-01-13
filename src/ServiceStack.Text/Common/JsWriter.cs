@@ -8,273 +8,296 @@ using ServiceStack.Text.Jsv;
 
 namespace ServiceStack.Text.Common
 {
-	public static class JsWriter
-	{
-		public const char MapStartChar = '{';
-		public const char MapKeySeperator = ':';
-		public const char ItemSeperator = ',';
-		public const char MapEndChar = '}';
-		public const string MapNullValue = "\"\"";
-		public const string EmptyMap = "{}";
+    public static class JsWriter
+    {
+        public const string TypeAttr = "__type";
 
-		public const char ListStartChar = '[';
-		public const char ListEndChar = ']';
-		public const char ReturnChar = '\r';
-		public const char LineFeedChar = '\n';
+        public const char MapStartChar = '{';
+        public const char MapKeySeperator = ':';
+        public const char ItemSeperator = ',';
+        public const char MapEndChar = '}';
+        public const string MapNullValue = "\"\"";
+        public const string EmptyMap = "{}";
 
-		public const char QuoteChar = '"';
-		public const string QuoteString = "\"";
-		public const string EscapedQuoteString = "\\\"";
-		public const string ItemSeperatorString = ",";
-		public const string MapKeySeperatorString = ":";
+        public const char ListStartChar = '[';
+        public const char ListEndChar = ']';
+        public const char ReturnChar = '\r';
+        public const char LineFeedChar = '\n';
 
-		public static readonly char[] CsvChars = new[] { ItemSeperator, QuoteChar };
-		public static readonly char[] EscapeChars = new[] { QuoteChar, MapKeySeperator, ItemSeperator, MapStartChar, MapEndChar, ListStartChar, ListEndChar, ReturnChar, LineFeedChar };
+        public const char QuoteChar = '"';
+        public const string QuoteString = "\"";
+        public const string EscapedQuoteString = "\\\"";
+        public const string ItemSeperatorString = ",";
+        public const string MapKeySeperatorString = ":";
 
-		private const int LengthFromLargestChar = '}' + 1;
-		private static readonly bool[] EscapeCharFlags = new bool[LengthFromLargestChar];
+        public static readonly char[] CsvChars = new[] { ItemSeperator, QuoteChar };
+        public static readonly char[] EscapeChars = new[] { QuoteChar, MapKeySeperator, ItemSeperator, MapStartChar, MapEndChar, ListStartChar, ListEndChar, ReturnChar, LineFeedChar };
 
-		static JsWriter()
-		{
-			foreach (var escapeChar in EscapeChars)
-			{
-				EscapeCharFlags[escapeChar] = true;
-			}
-		}
+        private const int LengthFromLargestChar = '}' + 1;
+        private static readonly bool[] EscapeCharFlags = new bool[LengthFromLargestChar];
 
-		/// <summary>
-		/// micro optimizations: using flags instead of value.IndexOfAny(EscapeChars)
-		/// </summary>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public static bool HasAnyEscapeChars(string value)
-		{
-			var len = value.Length;
-			for (var i = 0; i < len; i++)
-			{
-				var c = value[i];
-				if (c >= LengthFromLargestChar || !EscapeCharFlags[c]) continue;
-				return true;
-			}
-			return false;
-		}
+        static JsWriter()
+        {
+            foreach (var escapeChar in EscapeChars)
+            {
+                EscapeCharFlags[escapeChar] = true;
+            }
+            var loadConfig = JsConfig.IncludeNullValues;
+        }
 
-		internal static void WriteItemSeperatorIfRanOnce(TextWriter writer, ref bool ranOnce)
-		{
-			if (ranOnce)
-				writer.Write(ItemSeperator);
-			else
-				ranOnce = true;
+        public static void WriteDynamic(Action callback)
+        {
+            JsState.IsWritingDynamic = true;
+            try
+            {
+                callback();
+            }
+            finally
+            {
+                JsState.IsWritingDynamic = false;
+            }
+        }
 
-			foreach (var escapeChar in EscapeChars)
-			{
-				EscapeCharFlags[escapeChar] = true;
-			}
-		}
+        /// <summary>
+        /// micro optimizations: using flags instead of value.IndexOfAny(EscapeChars)
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool HasAnyEscapeChars(string value)
+        {
+            var len = value.Length;
+            for (var i = 0; i < len; i++)
+            {
+                var c = value[i];
+                if (c >= LengthFromLargestChar || !EscapeCharFlags[c]) continue;
+                return true;
+            }
+            return false;
+        }
 
-		internal static bool ShouldUseDefaultToStringMethod(Type type)
-		{
-			return type == typeof(byte) || type == typeof(byte?)
-					|| type == typeof(short) || type == typeof(short?)
-					|| type == typeof(ushort) || type == typeof(ushort?)
-					|| type == typeof(int) || type == typeof(int?)
-					|| type == typeof(uint) || type == typeof(uint?)
-					|| type == typeof(long) || type == typeof(long?)
-					|| type == typeof(ulong) || type == typeof(ulong?)
-					|| type == typeof(bool) || type == typeof(bool?)
-					|| type != typeof(DateTime)
-					|| type != typeof(DateTime?)
-					|| type != typeof(Guid)
-					|| type != typeof(Guid?)
-					|| type != typeof(float) || type != typeof(float?)
-					|| type != typeof(double) || type != typeof(double?)
-					|| type != typeof(decimal) || type != typeof(decimal?);
-		}
+        internal static void WriteItemSeperatorIfRanOnce(TextWriter writer, ref bool ranOnce)
+        {
+            if (ranOnce)
+                writer.Write(ItemSeperator);
+            else
+                ranOnce = true;
 
-		internal static ITypeSerializer GetTypeSerializer<TSerializer>()
-		{
-			if (typeof(TSerializer) == typeof(JsvTypeSerializer))
-				return JsvTypeSerializer.Instance;
+            foreach (var escapeChar in EscapeChars)
+            {
+                EscapeCharFlags[escapeChar] = true;
+            }
+        }
 
-			if (typeof(TSerializer) == typeof(JsonTypeSerializer))
-				return JsonTypeSerializer.Instance;
+        internal static bool ShouldUseDefaultToStringMethod(Type type)
+        {
+            return type == typeof(byte) || type == typeof(byte?)
+                    || type == typeof(short) || type == typeof(short?)
+                    || type == typeof(ushort) || type == typeof(ushort?)
+                    || type == typeof(int) || type == typeof(int?)
+                    || type == typeof(uint) || type == typeof(uint?)
+                    || type == typeof(long) || type == typeof(long?)
+                    || type == typeof(ulong) || type == typeof(ulong?)
+                    || type == typeof(bool) || type == typeof(bool?)
+                    || type != typeof(DateTime)
+                    || type != typeof(DateTime?)
+                    || type != typeof(Guid)
+                    || type != typeof(Guid?)
+                    || type != typeof(float) || type != typeof(float?)
+                    || type != typeof(double) || type != typeof(double?)
+                    || type != typeof(decimal) || type != typeof(decimal?);
+        }
 
-			throw new NotSupportedException(typeof(TSerializer).Name);
-		}
-	}
+        internal static ITypeSerializer GetTypeSerializer<TSerializer>()
+        {
+            if (typeof(TSerializer) == typeof(JsvTypeSerializer))
+                return JsvTypeSerializer.Instance;
 
-	internal class JsWriter<TSerializer>
-		where TSerializer : ITypeSerializer
-	{
-		private static readonly ITypeSerializer Serializer = JsWriter.GetTypeSerializer<TSerializer>();
+            if (typeof(TSerializer) == typeof(JsonTypeSerializer))
+                return JsonTypeSerializer.Instance;
 
-		public JsWriter()
-		{
-			this.SpecialTypes = new Dictionary<Type, WriteObjectDelegate>
+            throw new NotSupportedException(typeof(TSerializer).Name);
+        }
+    }
+
+    internal class JsWriter<TSerializer>
+        where TSerializer : ITypeSerializer
+    {
+        private static readonly ITypeSerializer Serializer = JsWriter.GetTypeSerializer<TSerializer>();
+
+        public JsWriter()
+        {
+            this.SpecialTypes = new Dictionary<Type, WriteObjectDelegate>
         	{
         		{ typeof(Uri), Serializer.WriteObjectString },
         		{ typeof(Type), WriteType },
         		{ typeof(Exception), Serializer.WriteException },
         	};
-		}
+        }
 
-		public WriteObjectDelegate GetValueTypeToStringMethod(Type type)
-		{
-			if (type == typeof(byte) || type == typeof(byte?)
-				|| type == typeof(short) || type == typeof(short?)
-				|| type == typeof(ushort) || type == typeof(ushort?)
-				|| type == typeof(int) || type == typeof(int?)
-				|| type == typeof(uint) || type == typeof(uint?)
-				|| type == typeof(long) || type == typeof(long?)
-				|| type == typeof(ulong) || type == typeof(ulong?)
-				)
-				return Serializer.WriteInteger;
+        public WriteObjectDelegate GetValueTypeToStringMethod(Type type)
+        {
+            if (type == typeof(byte) || type == typeof(byte?)
+                || type == typeof(short) || type == typeof(short?)
+                || type == typeof(ushort) || type == typeof(ushort?)
+                || type == typeof(int) || type == typeof(int?)
+                || type == typeof(uint) || type == typeof(uint?)
+                || type == typeof(long) || type == typeof(long?)
+                || type == typeof(ulong) || type == typeof(ulong?)
+                )
+                return Serializer.WriteInteger;
 
-			if (type == typeof(bool) || type == typeof(bool?))
-				return Serializer.WriteBool;
+            if (type == typeof(bool) || type == typeof(bool?))
+                return Serializer.WriteBool;
 
-			if (type == typeof(DateTime))
-				return Serializer.WriteDateTime;
+            if (type == typeof(DateTime))
+                return Serializer.WriteDateTime;
 
-			if (type == typeof(DateTime?))
-				return Serializer.WriteNullableDateTime;
+            if (type == typeof(DateTime?))
+                return Serializer.WriteNullableDateTime;
 
-			if (type == typeof(Guid))
-				return Serializer.WriteGuid;
+            if (type == typeof(Guid))
+                return Serializer.WriteGuid;
 
-			if (type == typeof(Guid?))
-				return Serializer.WriteNullableGuid;
+            if (type == typeof(Guid?))
+                return Serializer.WriteNullableGuid;
 
-			if (type == typeof(float) || type == typeof(float?))
-				return Serializer.WriteFloat;
+            if (type == typeof(float) || type == typeof(float?))
+                return Serializer.WriteFloat;
 
-			if (type == typeof(double) || type == typeof(double?))
-				return Serializer.WriteDouble;
+            if (type == typeof(double) || type == typeof(double?))
+                return Serializer.WriteDouble;
 
-			if (type == typeof(decimal) || type == typeof(decimal?))
-				return Serializer.WriteDecimal;
+            if (type == typeof(decimal) || type == typeof(decimal?))
+                return Serializer.WriteDecimal;
 
-			return Serializer.WriteBuiltIn;
-		}
+            if (type.IsEnum || type.UnderlyingSystemType.IsEnum)
+                return type.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0
+                    ? (WriteObjectDelegate)Serializer.WriteEnumFlags
+                    : Serializer.WriteEnum;
 
-		internal WriteObjectDelegate GetWriteFn<T>()
-		{
-			if (typeof(T) == typeof(string))
-			{
-				return Serializer.WriteObjectString;
-			}
+            return Serializer.WriteBuiltIn;
+        }
 
-			if (typeof(T).IsValueType)
-			{
-				return GetValueTypeToStringMethod(typeof(T));
-			}
+        internal WriteObjectDelegate GetWriteFn<T>()
+        {
+            if (typeof(T) == typeof(string))
+            {
+                return Serializer.WriteObjectString;
+            }
 
-			var specialWriteFn = GetSpecialWriteFn(typeof(T));
-			if (specialWriteFn != null)
-			{
-				return specialWriteFn;
-			}
+            if (typeof(T).IsValueType)
+            {
+                return JsConfig<T>.SerializeFn != null
+                    ? JsConfig<T>.WriteFn<TSerializer>
+                    : GetValueTypeToStringMethod(typeof(T));
+            }
 
-			if (typeof(T).IsArray)
-			{
-				if (typeof(T) == typeof(byte[]))
-					return (w, x) => WriteLists.WriteBytes(Serializer, w, x);
+            var specialWriteFn = GetSpecialWriteFn(typeof(T));
+            if (specialWriteFn != null)
+            {
+                return specialWriteFn;
+            }
 
-				if (typeof(T) == typeof(string[]))
-					return (w, x) => WriteLists.WriteStringArray(Serializer, w, x);
+            if (typeof(T).IsArray)
+            {
+                if (typeof(T) == typeof(byte[]))
+                    return (w, x) => WriteLists.WriteBytes(Serializer, w, x);
 
-				if (typeof(T) == typeof(int[]))
-					return WriteListsOfElements<int, TSerializer>.WriteGenericArrayValueType;
-				if (typeof(T) == typeof(long[]))
-					return WriteListsOfElements<long, TSerializer>.WriteGenericArrayValueType;
+                if (typeof(T) == typeof(string[]))
+                    return (w, x) => WriteLists.WriteStringArray(Serializer, w, x);
 
-				var elementType = typeof(T).GetElementType();
-				var writeFn = WriteListsOfElements<TSerializer>.GetGenericWriteArray(elementType);
-				return writeFn;
-			}
+                if (typeof(T) == typeof(int[]))
+                    return WriteListsOfElements<int, TSerializer>.WriteGenericArrayValueType;
+                if (typeof(T) == typeof(long[]))
+                    return WriteListsOfElements<long, TSerializer>.WriteGenericArrayValueType;
 
-			if (typeof(T).IsGenericType())
-			{
-				if (typeof(T).IsOrHasGenericInterfaceTypeOf(typeof(IList<>)))
-					return WriteLists<T, TSerializer>.Write;
+                var elementType = typeof(T).GetElementType();
+                var writeFn = WriteListsOfElements<TSerializer>.GetGenericWriteArray(elementType);
+                return writeFn;
+            }
 
-				var mapInterface = typeof(T).GetTypeWithGenericTypeDefinitionOf(typeof(IDictionary<,>));
-				if (mapInterface != null)
-				{
-					var mapTypeArgs = mapInterface.GetGenericArguments();
-					var writeFn = WriteDictionary<TSerializer>.GetWriteGenericDictionary(
-						mapTypeArgs[0], mapTypeArgs[1]);
+            if (typeof(T).IsGenericType())
+            {
+                if (typeof(T).IsOrHasGenericInterfaceTypeOf(typeof(IList<>)))
+                    return WriteLists<T, TSerializer>.Write;
 
-					var keyWriteFn = Serializer.GetWriteFn(mapTypeArgs[0]);
-					var valueWriteFn = Serializer.GetWriteFn(mapTypeArgs[1]);
+                var mapInterface = typeof(T).GetTypeWithGenericTypeDefinitionOf(typeof(IDictionary<,>));
+                if (mapInterface != null)
+                {
+                    var mapTypeArgs = mapInterface.GetGenericArguments();
+                    var writeFn = WriteDictionary<TSerializer>.GetWriteGenericDictionary(
+                        mapTypeArgs[0], mapTypeArgs[1]);
 
-					return (w, x) => writeFn(w, x, keyWriteFn, valueWriteFn);
-				}
+                    var keyWriteFn = Serializer.GetWriteFn(mapTypeArgs[0]);
+                    var valueWriteFn = Serializer.GetWriteFn(mapTypeArgs[1]);
 
-				var enumerableInterface = typeof(T).GetTypeWithGenericTypeDefinitionOf(typeof(IEnumerable<>));
-				if (enumerableInterface != null)
-				{
-					var elementType = enumerableInterface.GetGenericArguments()[0];
-					var writeFn = WriteListsOfElements<TSerializer>.GetGenericWriteEnumerable(elementType);
-					return writeFn;
-				}
-			}
+                    return (w, x) => writeFn(w, x, keyWriteFn, valueWriteFn);
+                }
 
-			var isCollection = typeof(T).IsOrHasGenericInterfaceTypeOf(typeof(ICollection));
-			if (isCollection)
-			{
-				var isDictionary = typeof(T).IsAssignableFrom(typeof(IDictionary))
-					|| typeof(T).HasInterface(typeof(IDictionary));
-				if (isDictionary)
-				{
-					return WriteDictionary<TSerializer>.WriteIDictionary;
-				}
+                var enumerableInterface = typeof(T).GetTypeWithGenericTypeDefinitionOf(typeof(IEnumerable<>));
+                if (enumerableInterface != null)
+                {
+                    var elementType = enumerableInterface.GetGenericArguments()[0];
+                    var writeFn = WriteListsOfElements<TSerializer>.GetGenericWriteEnumerable(elementType);
+                    return writeFn;
+                }
+            }
 
-				return WriteListsOfElements<TSerializer>.WriteIEnumerable;
-			}
+            var isCollection = typeof(T).IsOrHasGenericInterfaceTypeOf(typeof(ICollection));
+            if (isCollection)
+            {
+                var isDictionary = typeof(T).IsAssignableFrom(typeof(IDictionary))
+                    || typeof(T).HasInterface(typeof(IDictionary));
+                if (isDictionary)
+                {
+                    return WriteDictionary<TSerializer>.WriteIDictionary;
+                }
 
-			var isEnumerable = typeof(T).IsAssignableFrom(typeof(IEnumerable))
-				|| typeof(T).HasInterface(typeof(IEnumerable));
+                return WriteListsOfElements<TSerializer>.WriteIEnumerable;
+            }
 
-			if (isEnumerable)
-			{
-				return WriteListsOfElements<TSerializer>.WriteIEnumerable;
-			}
+            var isEnumerable = typeof(T).IsAssignableFrom(typeof(IEnumerable))
+                || typeof(T).HasInterface(typeof(IEnumerable));
 
-			if (typeof(T).IsClass || typeof(T).IsInterface)
-			{
-				var typeToStringMethod = WriteType<T, TSerializer>.Write;
-				if (typeToStringMethod != null)
-				{
-					return typeToStringMethod;
-				}
-			}
+            if (isEnumerable)
+            {
+                return WriteListsOfElements<TSerializer>.WriteIEnumerable;
+            }
 
-			return Serializer.WriteBuiltIn;
-		}
+            if (typeof(T).IsClass || typeof(T).IsInterface)
+            {
+                var typeToStringMethod = WriteType<T, TSerializer>.Write;
+                if (typeToStringMethod != null)
+                {
+                    return typeToStringMethod;
+                }
+            }
+
+            return Serializer.WriteBuiltIn;
+        }
 
 
-		public Dictionary<Type, WriteObjectDelegate> SpecialTypes;
+        public Dictionary<Type, WriteObjectDelegate> SpecialTypes;
 
-		public WriteObjectDelegate GetSpecialWriteFn(Type type)
-		{
-			WriteObjectDelegate writeFn = null;
-			if (SpecialTypes.TryGetValue(type, out writeFn))
-				return writeFn;
+        public WriteObjectDelegate GetSpecialWriteFn(Type type)
+        {
+            WriteObjectDelegate writeFn = null;
+            if (SpecialTypes.TryGetValue(type, out writeFn))
+                return writeFn;
 
-			if (type.IsInstanceOfType(typeof(Type)))
-				return WriteType;
+            if (type.IsInstanceOfType(typeof(Type)))
+                return WriteType;
 
-			if (type.IsInstanceOf(typeof(Exception)))
-				return Serializer.WriteException;
+            if (type.IsInstanceOf(typeof(Exception)))
+                return Serializer.WriteException;
 
-			return null;
-		}
+            return null;
+        }
 
-		public void WriteType(TextWriter writer, object value)
-		{
-			Serializer.WriteRawString(writer, ((Type)value).AssemblyQualifiedName);
-		}
+        public void WriteType(TextWriter writer, object value)
+        {
+            Serializer.WriteRawString(writer, ((Type)value).ToTypeString());
+        }
 
-	}
+    }
 }

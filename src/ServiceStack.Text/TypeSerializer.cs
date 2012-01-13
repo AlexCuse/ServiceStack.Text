@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using ServiceStack.Text.Common;
 using ServiceStack.Text.Jsv;
 
 namespace ServiceStack.Text
@@ -78,11 +79,31 @@ namespace ServiceStack.Text
 		{
 			if (value == null) return null;
 			if (typeof(T) == typeof(string)) return value as string;
+            if (typeof(T) == typeof(object) || typeof(T).IsAbstract || typeof(T).IsInterface)
+            {
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = true;
+                var result = SerializeToString(value, value.GetType());
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = false;
+                return result;
+            }
 
 			var sb = new StringBuilder(4096);
 			using (var writer = new StringWriter(sb, CultureInfo.InvariantCulture))
 			{
 				JsvWriter<T>.WriteObject(writer, value);
+			}
+			return sb.ToString();
+		}
+
+		public static string SerializeToString(object value, Type type)
+		{
+			if (value == null) return null;
+			if (type == typeof(string)) return value as string;
+
+			var sb = new StringBuilder(4096);
+			using (var writer = new StringWriter(sb, CultureInfo.InvariantCulture))
+			{
+				JsvWriter.GetWriteFn(type)(writer, value);
 			}
 			return sb.ToString();
 		}
@@ -95,8 +116,50 @@ namespace ServiceStack.Text
 				writer.Write(value);
 				return;
 			}
+			if (typeof(T) == typeof(object))
+			{
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = true;
+                SerializeToWriter(value, value.GetType(), writer);
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = false;
+                return;
+			}
 
 			JsvWriter<T>.WriteObject(writer, value);
+		}
+
+		public static void SerializeToWriter(object value, Type type, TextWriter writer)
+		{
+			if (value == null) return;
+			if (type == typeof(string))
+			{
+				writer.Write(value);
+				return;
+			}
+
+			JsvWriter.GetWriteFn(type)(writer, value);
+		}
+
+		public static void SerializeToStream<T>(T value, Stream stream)
+		{
+			if (value == null) return;
+			if (typeof(T) == typeof(object))
+			{
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = true;
+                SerializeToStream(value, value.GetType(), stream);
+                if (typeof(T).IsAbstract || typeof(T).IsInterface) JsState.IsWritingDynamic = false;
+                return;
+			}
+
+			var writer = new StreamWriter(stream, UTF8EncodingWithoutBom);
+			JsvWriter<T>.WriteObject(writer, value);
+			writer.Flush();
+		}
+
+		public static void SerializeToStream(object value, Type type, Stream stream)
+		{
+			var writer = new StreamWriter(stream, UTF8EncodingWithoutBom);
+			JsvWriter.GetWriteFn(type)(writer, value);
+			writer.Flush();
 		}
 
 		public static T Clone<T>(T value)
@@ -104,13 +167,6 @@ namespace ServiceStack.Text
 			var serializedValue = SerializeToString(value);
 			var cloneObj = DeserializeFromString<T>(serializedValue);
 			return cloneObj;
-		}
-
-		public static void SerializeToStream<T>(T value, Stream stream)
-		{
-			var writer = new StreamWriter(stream, UTF8EncodingWithoutBom);
-			JsvWriter<T>.WriteObject(writer, value);
-			writer.Flush();
 		}
 
 		public static T DeserializeFromStream<T>(Stream stream)

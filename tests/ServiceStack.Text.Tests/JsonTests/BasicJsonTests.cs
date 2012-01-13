@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using NUnit.Framework;
 using ServiceStack.Common.Tests.Models;
 
@@ -124,14 +125,6 @@ namespace ServiceStack.Text.Tests.JsonTests
             Assert.That(o.Nothing, Is.EqualTo("zilch"));
         }
 
-        [Test]
-        [ExpectedException(typeof(ArgumentNullException))]
-        public void Deserialize_throws_for_null_valuetypes()
-        {
-            var s = "{\"Name\":\"Brandon\",\"Type\":\"Programmer\",\"SampleKey\":null}";
-            var o = JsonSerializer.DeserializeFromString<NullValueTester>(s);
-        }
-
         private class NullValueTester
         {
             public string Name
@@ -166,5 +159,26 @@ namespace ServiceStack.Text.Tests.JsonTests
                 Nothing = "zilch";
             }
         }
+		
+		[DataContract]
+		class Person
+		{
+			[DataMember(Name = "MyID")]
+			public int Id { get; set; }
+			[DataMember]
+			public string Name { get; set; }
+		}
+
+		[Test]
+		public void Can_override_name()
+		{
+			var person = new Person {
+				Id = 123,
+				Name = "Abc"
+			};
+
+			Assert.That(TypeSerializer.SerializeToString(person), Is.EqualTo("{MyID:123,Name:Abc}"));
+			Assert.That(JsonSerializer.SerializeToString(person), Is.EqualTo("{\"MyID\":123,\"Name\":\"Abc\"}"));
+		}
 	}
 }

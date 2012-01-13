@@ -12,9 +12,10 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using ServiceStack.Text.Json;
 using ServiceStack.Text.Reflection;
+using System.Linq;
+using System.Runtime.Serialization;
 
 namespace ServiceStack.Text.Common
 {
@@ -25,10 +26,33 @@ namespace ServiceStack.Text.Common
 
 		private static readonly WriteObjectDelegate CacheFn;
 		internal static TypePropertyWriter[] PropertyWriters;
+		private static WriteObjectDelegate WriteTypeInfo;
 
 		static WriteType()
 		{
 			CacheFn = Init() ? GetWriteFn() : WriteEmptyType;
+
+			if (typeof(T).IsAbstract)
+			{
+				WriteTypeInfo = TypeInfoWriter;
+			}
+		}
+
+		public static void TypeInfoWriter(TextWriter writer, object obj)
+		{
+			DidWriteTypeInfo(writer, obj);
+		}
+
+		private static bool DidWriteTypeInfo(TextWriter writer, object obj)
+		{
+			if (obj == null
+				|| JsConfig.ExcludeTypeInfo
+				|| JsConfig<T>.ExcludeTypeInfo) return false;
+
+			Serializer.WriteRawString(writer, JsWriter.TypeAttr);
+			writer.Write(JsWriter.MapKeySeperator);
+			Serializer.WriteRawString(writer, obj.GetType().ToTypeString());
+			return true;
 		}
 
 		public static WriteObjectDelegate Write
@@ -46,7 +70,7 @@ namespace ServiceStack.Text.Common
 			if (!typeof(T).IsClass && !typeof(T).IsInterface) return false;
 
 			var propertyInfos = TypeConfig<T>.Properties;
-			if (propertyInfos.Length == 0)
+			if (propertyInfos.Length == 0 && !JsState.IsWritingDynamic)
 			{
 				return typeof(T).IsDto();
 			}
@@ -55,15 +79,42 @@ namespace ServiceStack.Text.Common
 
 			PropertyWriters = new TypePropertyWriter[propertyNamesLength];
 
+			// NOTE: very limited support for DataContractSerialization (DCS)
+			//	NOT supporting Serializable
+			//	support for DCS is intended for (re)Name of properties and Ignore by NOT having a DataMember present
+			var isDataContract = typeof(T).GetCustomAttributes(typeof(DataContractAttribute), false).Any();
 			for (var i = 0; i < propertyNamesLength; i++)
 			{
 				var propertyInfo = propertyInfos[i];
 
+				string propertyName, propertyNameCLSFriendly;
+
+				if (isDataContract)
+				{
+					var dcsDataMember = propertyInfo.GetCustomAttributes(typeof(DataMemberAttribute), false).FirstOrDefault() as DataMemberAttribute;
+					if (dcsDataMember == null) continue;
+
+					propertyName = dcsDataMember.Name ?? propertyInfo.Name;
+					propertyNameCLSFriendly = dcsDataMember.Name ?? propertyName.ToCamelCase();
+				}
+				else
+				{
+					propertyName = propertyInfo.Name;
+					propertyNameCLSFriendly = propertyName.ToCamelCase();
+				}
+
+			    var propertyType = propertyInfo.PropertyType;
+			    var suppressDefaultValue = propertyType.IsValueType && JsConfig.HasSerializeFn.Contains(propertyType)
+			        ? ReflectionExtensions.GetDefaultValue(propertyType)
+			        : null;
+
 				PropertyWriters[i] = new TypePropertyWriter
 				(
-					propertyInfo.Name,
+					propertyName,
+					propertyNameCLSFriendly,
 					propertyInfo.GetValueGetter<T>(),
-					Serializer.GetWriteFn(propertyInfo.PropertyType)
+                    Serializer.GetWriteFn(propertyType),
+                    suppressDefaultValue
 				);
 			}
 
@@ -72,16 +123,29 @@ namespace ServiceStack.Text.Common
 
 		internal struct TypePropertyWriter
 		{
-			internal readonly string PropertyName;
-			internal readonly Func<T, object> GetterFn;
-			internal readonly WriteObjectDelegate WriteFn;
-
-			public TypePropertyWriter(string propertyName,
-				Func<T, object> getterFn, WriteObjectDelegate writeFn)
+			internal string PropertyName
 			{
-				this.PropertyName = propertyName;
+				get
+				{
+					return (JsConfig.EmitCamelCaseNames)
+						? propertyNameCLSFriendly
+						: propertyName;
+				}
+			}
+			internal readonly string propertyName;
+			internal readonly string propertyNameCLSFriendly;
+			internal readonly Func<T, object> GetterFn;
+            internal readonly WriteObjectDelegate WriteFn;
+            internal readonly object DefaultValue;
+
+			public TypePropertyWriter(string propertyName, string propertyNameCLSFriendly,
+				Func<T, object> getterFn, WriteObjectDelegate writeFn, object defaultValue)
+			{
+				this.propertyName = propertyName;
+				this.propertyNameCLSFriendly = propertyNameCLSFriendly;
 				this.GetterFn = getterFn;
 				this.WriteFn = writeFn;
+			    this.DefaultValue = defaultValue;
 			}
 		}
 
@@ -92,18 +156,25 @@ namespace ServiceStack.Text.Common
 
 		public static void WriteProperties(TextWriter writer, object value)
 		{
-			if (typeof(TSerializer) == typeof(JsonTypeSerializer) && JsState.WritingKeyCount > 0) 
+			if (typeof(TSerializer) == typeof(JsonTypeSerializer) && JsState.WritingKeyCount > 0)
 				writer.Write(JsWriter.QuoteChar);
 
 			writer.Write(JsWriter.MapStartChar);
 
+			var i = 0;
+			if (WriteTypeInfo != null || JsState.IsWritingDynamic)
+			{
+				if (DidWriteTypeInfo(writer, value)) i++;
+			}
+
 			if (PropertyWriters != null)
 			{
-				var i = 0;
 				foreach (var propertyWriter in PropertyWriters)
 				{
 					var propertyValue = propertyWriter.GetterFn((T)value);
-					if (propertyValue == null && !JsConfig.IncludeNullValues) continue;
+
+                    if ((propertyValue == null || (propertyWriter.DefaultValue != null && propertyWriter.DefaultValue.Equals(propertyValue))) 
+                        && !JsConfig.IncludeNullValues) continue;
 
 					if (i++ > 0)
 						writer.Write(JsWriter.ItemSeperator);

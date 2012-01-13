@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using ServiceStack.ServiceInterface.ServiceModel;
 using ServiceStack.ServiceModel.Serialization;
 
 namespace ServiceStack.Text.Tests
@@ -54,7 +55,7 @@ namespace ServiceStack.Text.Tests
 				SomeObjectList = new object[0]
 			};
 
-			Serialize(obj);
+			Serialize(obj, includeXml: false); // xml cannot serialize Type objects.
 		}
 
 		[Test]
@@ -73,7 +74,7 @@ namespace ServiceStack.Text.Tests
 			var toModel = TypeSerializer.DeserializeFromString<TestObject>(strModel);
 		}
 
-		class Article
+		public class Article
 		{
 			public string title { get; set; }
 			public string url { get; set; }
@@ -156,6 +157,41 @@ namespace ServiceStack.Text.Tests
 			basket.Items.Add(new Item { type = 4, color = 1 }, 20);
 
 			Serialize(basket);
+		}
+
+        public class Book
+        {
+            public UInt64 Id { get; set; }
+            public UInt64 OwnerUserId { get; set; }
+            public String Title { get; set; }
+            public String Description { get; set; }
+            public UInt16 CategoryId { get; set; }
+            public DateTime CreatedDateTime { get; set; }
+            public Byte Icon { get; set; }
+            public Boolean Canceled { get; set; }
+        }
+
+        public class BookResponse : IHasResponseStatus
+        {
+            public Book Book { get; set; }
+            public ResponseStatus ResponseStatus { get; set; }
+        }
+
+        public object GetBook()
+        {
+            var response = new BookResponse();
+            return response;
+        }
+
+        [Test]
+        public void Does_not_serialize_typeinfo_for_concrete_types()
+        {
+            var json = GetBook().ToJson();
+            Console.WriteLine(json);
+            Assert.That(json.IndexOf("__"), Is.EqualTo(-1));
+
+        	var jsv = GetBook().ToJsv();
+			Assert.That(jsv.IndexOf("__"), Is.EqualTo(-1));
 		}
 	}
 }

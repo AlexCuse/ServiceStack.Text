@@ -23,6 +23,8 @@ namespace ServiceStack.Text.Json
 	{
 		public static ITypeSerializer Instance = new JsonTypeSerializer();
 
+		public string TypeAttrInObject { get { return "{\"__type\":"; } }
+
 		public static readonly bool[] WhiteSpaceFlags = new bool[(int)' ' + 1];
 
 		static JsonTypeSerializer()
@@ -188,7 +190,20 @@ namespace ServiceStack.Text.Json
 			if (JsState.WritingKeyCount > 0 && !JsState.IsWritingValue) writer.Write(JsonUtils.QuoteChar);
 		}
 
-		/// <summary>
+        public void WriteEnum(TextWriter writer, object enumValue)
+        {
+            if (enumValue == null) return;
+            WriteRawString(writer, enumValue.ToString());
+        }
+
+        public void WriteEnumFlags(TextWriter writer, object enumFlagValue)
+        {
+            if (enumFlagValue == null) return;
+            var intVal = (int)enumFlagValue;
+            writer.Write(intVal);
+        }
+
+	    /// <summary>
 		/// A JSON key needs to be a string with quotes
 		/// </summary>
 		/// <param name="value"></param>
@@ -228,7 +243,7 @@ namespace ServiceStack.Text.Json
 
 		public string ParseRawString(string value)
 		{
-			if (string.IsNullOrEmpty(value)) return value;
+			if (String.IsNullOrEmpty(value)) return value;
 
 			return value[0] == JsonUtils.QuoteChar
 				? value.Substring(1, value.Length - 2)
@@ -237,7 +252,7 @@ namespace ServiceStack.Text.Json
 
 		public string ParseString(string value)
 		{
-			if (string.IsNullOrEmpty(value)) return value;
+			if (String.IsNullOrEmpty(value)) return value;
 
 			return ParseRawString(value);
 		}
@@ -314,7 +329,7 @@ namespace ServiceStack.Text.Json
 							if (remainingLength >= 4)
 							{
 								var unicodeString = json.Substring(index, 4);
-								var unicodeIntVal = uint.Parse(unicodeString, NumberStyles.HexNumber);
+								var unicodeIntVal = UInt32.Parse(unicodeString, NumberStyles.HexNumber);
 								sb.Append(ConvertFromUtf32((int)unicodeIntVal));
 								index += 4;
 							}

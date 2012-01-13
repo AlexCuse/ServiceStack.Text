@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Threading;
 using ServiceStack.Text.Support;
 
 namespace ServiceStack.Text
@@ -24,22 +25,26 @@ namespace ServiceStack.Text
 
 	public static class ReflectionExtensions
 	{
-		private static readonly Dictionary<Type, object> DefaultValueTypes
-			= new Dictionary<Type, object>();
+		private static Dictionary<Type, object> DefaultValueTypes = new Dictionary<Type, object>();
 
 		public static object GetDefaultValue(Type type)
 		{
 			if (!type.IsValueType) return null;
 
 			object defaultValue;
-			lock (DefaultValueTypes)
+			if (DefaultValueTypes.TryGetValue(type, out defaultValue)) return defaultValue;
+
+			defaultValue = Activator.CreateInstance(type);
+
+			Dictionary<Type, object> snapshot, newCache;
+			do
 			{
-				if (!DefaultValueTypes.TryGetValue(type, out defaultValue))
-				{
-					defaultValue = Activator.CreateInstance(type);
-					DefaultValueTypes[type] = defaultValue;
-				}
-			}
+				snapshot = DefaultValueTypes;
+				newCache = new Dictionary<Type, object>(DefaultValueTypes);
+				newCache[type] = defaultValue;
+
+			} while (!ReferenceEquals(
+				Interlocked.CompareExchange(ref DefaultValueTypes, newCache, snapshot), snapshot));
 
 			return defaultValue;
 		}
@@ -147,14 +152,14 @@ namespace ServiceStack.Text
 		{
 			if (!type.IsValueType) return false;
 			var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
-			return underlyingType == typeof (byte)
-		       || underlyingType == typeof (sbyte)
-		       || underlyingType == typeof (short)
-		       || underlyingType == typeof (ushort)
-		       || underlyingType == typeof (int)
-		       || underlyingType == typeof (uint)
-		       || underlyingType == typeof (long)
-		       || underlyingType == typeof (ulong);
+			return underlyingType == typeof(byte)
+			   || underlyingType == typeof(sbyte)
+			   || underlyingType == typeof(short)
+			   || underlyingType == typeof(ushort)
+			   || underlyingType == typeof(int)
+			   || underlyingType == typeof(uint)
+			   || underlyingType == typeof(long)
+			   || underlyingType == typeof(ulong);
 		}
 
 		public static bool IsRealNumberType(this Type type)
@@ -250,19 +255,48 @@ namespace ServiceStack.Text
 			return true;
 		}
 
-		static readonly Dictionary<Type, EmptyCtorDelegate> ConstructorMethods = new Dictionary<Type, EmptyCtorDelegate>();
+		static Dictionary<Type, EmptyCtorDelegate> ConstructorMethods = new Dictionary<Type, EmptyCtorDelegate>();
 		public static EmptyCtorDelegate GetConstructorMethod(Type type)
 		{
-			lock (ConstructorMethods)
+			EmptyCtorDelegate emptyCtorFn;
+			if (ConstructorMethods.TryGetValue(type, out emptyCtorFn)) return emptyCtorFn;
+
+			emptyCtorFn = GetConstructorMethodToCache(type);
+
+			Dictionary<Type, EmptyCtorDelegate> snapshot, newCache;
+			do
 			{
-				EmptyCtorDelegate emptyCtorFn;
-				if (!ConstructorMethods.TryGetValue(type, out emptyCtorFn))
-				{
-					emptyCtorFn = GetConstructorMethodToCache(type);
-					ConstructorMethods[type] = emptyCtorFn;
-				}
-				return emptyCtorFn;
-			}
+				snapshot = ConstructorMethods;
+				newCache = new Dictionary<Type, EmptyCtorDelegate>(ConstructorMethods);
+				newCache[type] = emptyCtorFn;
+
+			} while (!ReferenceEquals(
+				Interlocked.CompareExchange(ref ConstructorMethods, newCache, snapshot), snapshot));
+
+			return emptyCtorFn;
+		}
+
+		static Dictionary<string, EmptyCtorDelegate> TypeNamesMap = new Dictionary<string, EmptyCtorDelegate>();
+		public static EmptyCtorDelegate GetConstructorMethod(string typeName)
+		{
+			EmptyCtorDelegate emptyCtorFn;
+			if (TypeNamesMap.TryGetValue(typeName, out emptyCtorFn)) return emptyCtorFn;
+
+			var type = AssemblyUtils.FindType(typeName);
+			if (type == null) return null;
+			emptyCtorFn = GetConstructorMethodToCache(type);
+
+			Dictionary<string, EmptyCtorDelegate> snapshot, newCache;
+			do
+			{
+				snapshot = TypeNamesMap;
+				newCache = new Dictionary<string, EmptyCtorDelegate>(TypeNamesMap);
+				newCache[typeName] = emptyCtorFn;
+
+			} while (!ReferenceEquals(
+				Interlocked.CompareExchange(ref TypeNamesMap, newCache, snapshot), snapshot));
+
+			return emptyCtorFn;
 		}
 
 		public static EmptyCtorDelegate GetConstructorMethodToCache(Type type)
@@ -271,7 +305,7 @@ namespace ServiceStack.Text
 			if (emptyCtor != null)
 			{
 
-#if MONOTOUCH || SILVERLIGHT
+#if MONOTOUCH || SILVERLIGHT || XBOX
 				return () => Activator.CreateInstance(type);
 #else
 				var dm = new System.Reflection.Emit.DynamicMethod("MyCtor", type, Type.EmptyTypes, typeof(ReflectionExtensions).Module, true);
@@ -284,7 +318,7 @@ namespace ServiceStack.Text
 #endif
 			}
 
-#if SILVERLIGHT
+#if SILVERLIGHT || XBOX
 			return () => Activator.CreateInstance(type);
 #else
 			//Anonymous types don't have empty constructors
@@ -292,17 +326,30 @@ namespace ServiceStack.Text
 #endif
 		}
 
-		public static object CreateInstance(Type type)
+		private static class TypeMeta<T>
 		{
-			try
+			public static readonly EmptyCtorDelegate EmptyCtorFn;
+			static TypeMeta()
 			{
-				var ctorFn = GetConstructorMethod(type);
-				return ctorFn();
+				EmptyCtorFn = GetConstructorMethodToCache(typeof(T));
 			}
-			catch (Exception ex)
-			{
-				throw;
-			}
+		}
+
+		public static object CreateInstance<T>()
+		{
+			return TypeMeta<T>.EmptyCtorFn();
+		}
+
+		public static object CreateInstance(this Type type)
+		{
+			var ctorFn = GetConstructorMethod(type);
+			return ctorFn();
+		}
+
+		public static object CreateInstance(string typeName)
+		{
+			var ctorFn = GetConstructorMethod(typeName);
+			return ctorFn();
 		}
 
 		public static PropertyInfo[] GetPublicProperties(this Type type)
@@ -346,6 +393,7 @@ namespace ServiceStack.Text
 
 		const string DataContract = "DataContractAttribute";
 		const string DataMember = "DataMemberAttribute";
+		const string IgnoreDataMember = "IgnoreDataMemberAttribute";
 
 		public static PropertyInfo[] GetSerializableProperties(this Type type)
 		{
@@ -360,8 +408,8 @@ namespace ServiceStack.Text
 					attr.GetCustomAttributes(false).Any(x => x.GetType().Name == DataMember))
 					.ToArray();
 			}
-
-			return publicReadableProperties.ToArray();
+			// else return those properties that are not decorated with IgnoreDataMember
+			return publicReadableProperties.Where(prop => !prop.GetCustomAttributes(false).Any(attr => attr.GetType().Name == IgnoreDataMember)).ToArray();
 		}
 
 		public static bool IsDto(this Type type)

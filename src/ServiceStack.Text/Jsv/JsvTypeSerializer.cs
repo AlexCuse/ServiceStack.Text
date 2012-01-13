@@ -22,6 +22,8 @@ namespace ServiceStack.Text.Jsv
 	{
 		public static ITypeSerializer Instance = new JsvTypeSerializer();
 
+		public string TypeAttrInObject { get { return "{__type:"; } }
+
 		public WriteObjectDelegate GetWriteFn<T>()
 		{
 			return JsvWriter<T>.WriteFn();
@@ -123,8 +125,20 @@ namespace ServiceStack.Text.Jsv
 			writer.Write(((decimal)decimalValue).ToString(CultureInfo.InvariantCulture));
 		}
 
+	    public void WriteEnum(TextWriter writer, object enumValue)
+	    {
+            if (enumValue == null) return;
+            writer.Write(enumValue.ToString());
+        }
 
-		public object EncodeMapKey(object value)
+	    public void WriteEnumFlags(TextWriter writer, object enumFlagValue)
+	    {
+            if (enumFlagValue == null) return;
+	        var intVal = (int)enumFlagValue;
+            writer.Write(intVal);
+	    }
+
+	    public object EncodeMapKey(object value)
 		{
 			return value;
 		}

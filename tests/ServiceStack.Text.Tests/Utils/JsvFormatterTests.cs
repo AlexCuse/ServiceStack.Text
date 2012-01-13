@@ -23,6 +23,8 @@ namespace ServiceStack.Text.Tests.Utils
 			object model = new ModelWithIdAndName { Id = 1, Name = "Name" };
 			var modelStr = model.Dump();
 
+			Console.WriteLine(modelStr);
+
 			Assert.That(modelStr, Is.EqualTo("{\r\n\tId: 1,\r\n\tName: Name\r\n}"));
 		}
 

@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Runtime.Serialization;
 using NUnit.Framework;
 using ServiceStack.Common.Extensions;
 using ServiceStack.Text.Jsv;
@@ -67,8 +69,7 @@ namespace ServiceStack.Text.Tests
 
 			public static FlowPostTransient Create()
 			{
-				return new FlowPostTransient
-				{
+				return new FlowPostTransient {
 					Caption = "Caption",
 					CaptionSourceName = "CaptionSourceName",
 					CaptionUserId = Guid.NewGuid(),
@@ -96,15 +97,15 @@ namespace ServiceStack.Text.Tests
 			{
 				if (ReferenceEquals(null, other)) return false;
 				if (ReferenceEquals(this, other)) return true;
-				return other.Id == Id && Equals(other.Urn, Urn) && other.UserId.Equals(UserId) && other.DateAdded.IsEqualToTheSecond(DateAdded) && other.DateModified.IsEqualToTheSecond(DateModified) && other.TargetUserId.Equals(TargetUserId) && other.ForwardedPostId.Equals(ForwardedPostId) && other.OriginUserId.Equals(OriginUserId) && Equals(other.OriginUserName, OriginUserName) && other.SourceUserId.Equals(SourceUserId) && Equals(other.SourceUserName, SourceUserName) && Equals(other.SubjectUrn, SubjectUrn) && Equals(other.ContentUrn, ContentUrn) && TrackUrns.EquivalentTo(other.TrackUrns) && Equals(other.Caption, Caption) && other.CaptionUserId.Equals(CaptionUserId) && Equals(other.CaptionSourceName, CaptionSourceName) && Equals(other.ForwardedPostUrn, ForwardedPostUrn) && Equals(other.PostType, PostType) && other.OnBehalfOfUserId.Equals(OnBehalfOfUserId);
+				return other.Id == Id && Equals(other.Urn, Urn) && other.UserId.Equals(UserId) && other.DateAdded.RoundToMs().Equals(DateAdded.RoundToMs()) && other.DateModified.RoundToMs().Equals(DateModified.RoundToMs()) && other.TargetUserId.Equals(TargetUserId) && other.ForwardedPostId.Equals(ForwardedPostId) && other.OriginUserId.Equals(OriginUserId) && Equals(other.OriginUserName, OriginUserName) && other.SourceUserId.Equals(SourceUserId) && Equals(other.SourceUserName, SourceUserName) && Equals(other.SubjectUrn, SubjectUrn) && Equals(other.ContentUrn, ContentUrn) && TrackUrns.EquivalentTo(other.TrackUrns) && Equals(other.Caption, Caption) && other.CaptionUserId.Equals(CaptionUserId) && Equals(other.CaptionSourceName, CaptionSourceName) && Equals(other.ForwardedPostUrn, ForwardedPostUrn) && Equals(other.PostType, PostType) && other.OnBehalfOfUserId.Equals(OnBehalfOfUserId);
 			}
 
 			public override bool Equals(object obj)
 			{
 				if (ReferenceEquals(null, obj)) return false;
 				if (ReferenceEquals(this, obj)) return true;
-				if (obj.GetType() != typeof (FlowPostTransient)) return false;
-				return Equals((FlowPostTransient) obj);
+				if (obj.GetType() != typeof(FlowPostTransient)) return false;
+				return Equals((FlowPostTransient)obj);
 			}
 
 			public override int GetHashCode()
@@ -112,25 +113,25 @@ namespace ServiceStack.Text.Tests
 				unchecked
 				{
 					int result = Id.GetHashCode();
-					result = (result*397) ^ (Urn != null ? Urn.GetHashCode() : 0);
-					result = (result*397) ^ UserId.GetHashCode();
-					result = (result*397) ^ DateAdded.GetHashCode();
-					result = (result*397) ^ DateModified.GetHashCode();
-					result = (result*397) ^ (TargetUserId.HasValue ? TargetUserId.Value.GetHashCode() : 0);
-					result = (result*397) ^ (ForwardedPostId.HasValue ? ForwardedPostId.Value.GetHashCode() : 0);
-					result = (result*397) ^ OriginUserId.GetHashCode();
-					result = (result*397) ^ (OriginUserName != null ? OriginUserName.GetHashCode() : 0);
-					result = (result*397) ^ SourceUserId.GetHashCode();
-					result = (result*397) ^ (SourceUserName != null ? SourceUserName.GetHashCode() : 0);
-					result = (result*397) ^ (SubjectUrn != null ? SubjectUrn.GetHashCode() : 0);
-					result = (result*397) ^ (ContentUrn != null ? ContentUrn.GetHashCode() : 0);
-					result = (result*397) ^ (TrackUrns != null ? TrackUrns.GetHashCode() : 0);
-					result = (result*397) ^ (Caption != null ? Caption.GetHashCode() : 0);
-					result = (result*397) ^ CaptionUserId.GetHashCode();
-					result = (result*397) ^ (CaptionSourceName != null ? CaptionSourceName.GetHashCode() : 0);
-					result = (result*397) ^ (ForwardedPostUrn != null ? ForwardedPostUrn.GetHashCode() : 0);
-					result = (result*397) ^ PostType.GetHashCode();
-					result = (result*397) ^ (OnBehalfOfUserId.HasValue ? OnBehalfOfUserId.Value.GetHashCode() : 0);
+					result = (result * 397) ^ (Urn != null ? Urn.GetHashCode() : 0);
+					result = (result * 397) ^ UserId.GetHashCode();
+					result = (result * 397) ^ DateAdded.GetHashCode();
+					result = (result * 397) ^ DateModified.GetHashCode();
+					result = (result * 397) ^ (TargetUserId.HasValue ? TargetUserId.Value.GetHashCode() : 0);
+					result = (result * 397) ^ (ForwardedPostId.HasValue ? ForwardedPostId.Value.GetHashCode() : 0);
+					result = (result * 397) ^ OriginUserId.GetHashCode();
+					result = (result * 397) ^ (OriginUserName != null ? OriginUserName.GetHashCode() : 0);
+					result = (result * 397) ^ SourceUserId.GetHashCode();
+					result = (result * 397) ^ (SourceUserName != null ? SourceUserName.GetHashCode() : 0);
+					result = (result * 397) ^ (SubjectUrn != null ? SubjectUrn.GetHashCode() : 0);
+					result = (result * 397) ^ (ContentUrn != null ? ContentUrn.GetHashCode() : 0);
+					result = (result * 397) ^ (TrackUrns != null ? TrackUrns.GetHashCode() : 0);
+					result = (result * 397) ^ (Caption != null ? Caption.GetHashCode() : 0);
+					result = (result * 397) ^ CaptionUserId.GetHashCode();
+					result = (result * 397) ^ (CaptionSourceName != null ? CaptionSourceName.GetHashCode() : 0);
+					result = (result * 397) ^ (ForwardedPostUrn != null ? ForwardedPostUrn.GetHashCode() : 0);
+					result = (result * 397) ^ PostType.GetHashCode();
+					result = (result * 397) ^ (OnBehalfOfUserId.HasValue ? OnBehalfOfUserId.Value.GetHashCode() : 0);
 					return result;
 				}
 			}
@@ -168,7 +169,7 @@ namespace ServiceStack.Text.Tests
 			var jsonDate = JsonSerializer.SerializeToString(now);
 			var fromJsonDate = JsonSerializer.DeserializeFromString<DateTime>(jsonDate);
 
-			Assert.That(fromJsonDate.RoundToSecond(), Is.EqualTo(now.RoundToSecond()));
+			Assert.That(fromJsonDate.RoundToMs(), Is.EqualTo(now.RoundToMs()));
 		}
 
 		[Test]
@@ -179,6 +180,145 @@ namespace ServiceStack.Text.Tests
 				FlowPostTransient.Create()
 			};
 			Serialize(dtos);
+		}
+
+		[DataContract]
+		public class TestObject
+		{
+			[DataMember]
+			public string Value { get; set; }
+			public TranslatedString ValueNoMember { get; set; }
+
+			public bool Equals(TestObject other)
+			{
+				if (ReferenceEquals(null, other)) return false;
+				if (ReferenceEquals(this, other)) return true;
+				return Equals(other.Value, Value);
+			}
+
+			public override bool Equals(object obj)
+			{
+				if (ReferenceEquals(null, obj)) return false;
+				if (ReferenceEquals(this, obj)) return true;
+				if (obj.GetType() != typeof(TestObject)) return false;
+				return Equals((TestObject)obj);
+			}
+
+			public override int GetHashCode()
+			{
+				return (Value != null ? Value.GetHashCode() : 0);
+			}
+		}
+
+		public class Test
+		{
+			public string Val { get; set; }
+		}
+
+		public class TestResponse
+		{
+			public TestObject Result { get; set; }
+		}
+
+		public class TranslatedString : ListDictionary
+		{
+			public string CurrentLanguage { get; set; }
+
+			public string Value
+			{
+				get
+				{
+					if (this.Contains(CurrentLanguage))
+						return this[CurrentLanguage] as string;
+					return null;
+				}
+				set
+				{
+					if (this.Contains(CurrentLanguage))
+						this[CurrentLanguage] = value;
+					else
+						Add(CurrentLanguage, value);
+				}
+			}
+
+			public TranslatedString()
+			{
+				CurrentLanguage = "en";
+			}
+
+			public static void SetLanguageOnStrings(string lang, params TranslatedString[] strings)
+			{
+				foreach (TranslatedString str in strings)
+					str.CurrentLanguage = lang;
+			}
+		}
+
+		[Test]
+		public void Should_ignore_non_DataMember_TranslatedString()
+		{
+			var dto = new TestObject {
+				Value = "value",
+				ValueNoMember = new TranslatedString
+                {
+                    {"key1", "val1"},
+                    {"key2", "val2"},
+                }
+			};
+			SerializeAndCompare(dto);
+		}
+
+		public interface IParent
+		{
+			int Id { get; set; }
+			string ParentName { get; set; }
+		}
+
+		public class Parent : IParent
+		{
+			public int Id { get; set; }
+			public string ParentName { get; set; }
+			public Child Child { get; set; }
+		}
+
+		public class Child
+		{
+			public int Id { get; set; }
+			public string ChildName { get; set; }
+			public IParent Parent { get; set; }
+		}
+
+		[Test]
+		public void Can_Serailize_Cyclical_Dependency_via_interface()
+		{
+			var dto = new Parent {
+				Id = 1,
+				ParentName = "Parent",
+				Child = new Child { Id = 2, ChildName = "Child" }
+			};
+			dto.Child.Parent = dto;
+
+			var fromDto = Serialize(dto, includeXml: false);
+
+			var parent = (Parent)fromDto.Child.Parent;
+			Assert.That(parent.Id, Is.EqualTo(dto.Id));
+			Assert.That(parent.ParentName, Is.EqualTo(dto.ParentName));
+		}
+
+		public class Exclude
+		{
+			public int Id { get; set; }
+			public string Key { get; set; }
+		}
+
+		[Test]
+		public void Can_exclude_properties()
+		{
+			JsConfig<Exclude>.ExcludePropertyNames = new[] { "Id" };
+
+			var dto = new Exclude { Id = 1, Key = "Value" };
+
+			Assert.That(dto.ToJson(), Is.EqualTo("{\"Key\":\"Value\"}"));
+			Assert.That(dto.ToJsv(), Is.EqualTo("{Key:Value}"));
 		}
 	}
 }

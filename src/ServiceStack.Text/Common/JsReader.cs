@@ -14,21 +14,21 @@ namespace ServiceStack.Text.Common
 
 			if (type.IsEnum)
 			{
-				return x => Enum.Parse(type, x, false);
+				return x => Enum.Parse(type, x, true);
 			}
 
 			if (type == typeof(string))
 				return Serializer.ParseString;
 
 			if (type == typeof(object))
-				return x => x;
+				return DeserializeType<TSerializer>.ObjectStringToType;
 
 			var specialParseFn = ParseUtils.GetSpecialParseMethod(type);
 			if (specialParseFn != null)
 				return specialParseFn;
 
 			if (type.IsEnum)
-				return x => Enum.Parse(type, x, false);
+				return x => Enum.Parse(type, x, true);
 
 			if (type.IsArray)
 			{
@@ -38,6 +38,9 @@ namespace ServiceStack.Text.Common
 			var builtInMethod = DeserializeBuiltin<T>.Parse;
 			if (builtInMethod != null)
 				return value => builtInMethod(Serializer.ParseRawString(value));
+
+			if (JsConfig<T>.SerializeFn != null)
+				return value => JsConfig<T>.ParseFn(Serializer.ParseRawString(value));
 
 			if (type.IsGenericType())
 			{
@@ -69,7 +72,7 @@ namespace ServiceStack.Text.Common
 			var stringConstructor = DeserializeTypeUtils.GetParseMethod(type);
 			if (stringConstructor != null) return stringConstructor;
 
-			return null;
+			return DeserializeType<TSerializer>.ParseAbstractType<T>;
 		}
 		
 	}

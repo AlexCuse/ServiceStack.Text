@@ -14,74 +14,89 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using ServiceStack.Text.Common;
 
-namespace ServiceStack.Text.Json {
-    internal static class JsonWriter {
-        public static readonly JsWriter<JsonTypeSerializer> Instance = new JsWriter<JsonTypeSerializer> ();
+namespace ServiceStack.Text.Json
+{
+	internal static class JsonWriter
+	{
+		public static readonly JsWriter<JsonTypeSerializer> Instance = new JsWriter<JsonTypeSerializer>();
 
-        private static readonly Dictionary<Type, WriteObjectDelegate> WriteFnCache =
-            new Dictionary<Type, WriteObjectDelegate> ();
+        private static Dictionary<Type, WriteObjectDelegate> WriteFnCache = new Dictionary<Type, WriteObjectDelegate>();
 
-        public static WriteObjectDelegate GetWriteFn (Type type) {
-            try {
-                WriteObjectDelegate writeFn;
-                lock (WriteFnCache) {
-                    if (!WriteFnCache.TryGetValue (type, out writeFn)) {
-                        var genericType = typeof (JsonWriter<>).MakeGenericType (type);
-                        var mi = genericType.GetMethod ("WriteFn",
-                            BindingFlags.Public | BindingFlags.Static);
+		public static WriteObjectDelegate GetWriteFn(Type type)
+		{
+			try
+			{
+				WriteObjectDelegate writeFn;
+                if (WriteFnCache.TryGetValue(type, out writeFn)) return writeFn;
 
-                        var writeFactoryFn = (Func<WriteObjectDelegate>)Delegate.CreateDelegate (
-                            typeof (Func<WriteObjectDelegate>), mi);
-                        writeFn = writeFactoryFn ();
-                        if (writeFn != null) {
-                            WriteFnCache.Add (type, writeFn);
-                        }
-                    }
-                }
-                return writeFn;
-            }
-            catch (Exception ex) {
-                Tracer.Instance.WriteError (ex);
-                throw new ArgumentException (string.Format ("A function for the type {0} has already been added", type));
-            }
-        }
+                var genericType = typeof(JsonWriter<>).MakeGenericType(type);
+                var mi = genericType.GetMethod("WriteFn", BindingFlags.Public | BindingFlags.Static);
+                var writeFactoryFn = (Func<WriteObjectDelegate>)Delegate.CreateDelegate(typeof(Func<WriteObjectDelegate>), mi);
+                writeFn = writeFactoryFn();
 
-        public static void WriteLateBoundObject (TextWriter writer, object value) {
-            if (value == null) return;
-            var writeFn = GetWriteFn (value.GetType ());
-            writeFn (writer, value);
-        }
+                Dictionary<Type, WriteObjectDelegate> snapshot, newCache;
+                do
+                {
+                    snapshot = WriteFnCache;
+                    newCache = new Dictionary<Type, WriteObjectDelegate>(WriteFnCache);
+                    newCache[type] = writeFn;
 
-        public static WriteObjectDelegate GetValueTypeToStringMethod (Type type) {
-            return Instance.GetValueTypeToStringMethod (type);
-        }
-    }
+                } while (!ReferenceEquals(
+                    Interlocked.CompareExchange(ref WriteFnCache, newCache, snapshot), snapshot));
 
-    /// <summary>
-    /// Implement the serializer using a more static approach
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    internal static class JsonWriter<T> {
-        private static readonly WriteObjectDelegate CacheFn;
+				return writeFn;
+			}
+			catch (Exception ex)
+			{
+				Tracer.Instance.WriteError(ex);
+				throw;
+			}
+		}
 
-        public static WriteObjectDelegate WriteFn () {
-            return CacheFn;
-        }
+		public static void WriteLateBoundObject(TextWriter writer, object value)
+		{
+			if (value == null) return;
+			var writeFn = GetWriteFn(value.GetType());
 
-        static JsonWriter () {
-            if (typeof (T) == typeof (object)) {
-                CacheFn = JsonWriter.WriteLateBoundObject;
-            }
-            else {
-                CacheFn = JsonWriter.Instance.GetWriteFn<T> ();
-            }
-        }
+			var prevState = JsState.IsWritingDynamic;
+			JsState.IsWritingDynamic = true;
+			writeFn(writer, value);
+			JsState.IsWritingDynamic = prevState;
+		}
 
-        public static void WriteObject (TextWriter writer, object value) {
-            CacheFn (writer, value);
-        }
-    }
+		public static WriteObjectDelegate GetValueTypeToStringMethod(Type type)
+		{
+			return Instance.GetValueTypeToStringMethod(type);
+		}
+	}
+
+	/// <summary>
+	/// Implement the serializer using a more static approach
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	internal static class JsonWriter<T>
+	{
+		private static readonly WriteObjectDelegate CacheFn;
+
+		public static WriteObjectDelegate WriteFn()
+		{
+			return CacheFn;
+		}
+
+		static JsonWriter()
+		{
+            CacheFn = typeof(T) == typeof(object) 
+                ? JsonWriter.WriteLateBoundObject 
+                : JsonWriter.Instance.GetWriteFn<T>();
+		}
+
+	    public static void WriteObject(TextWriter writer, object value)
+		{
+			CacheFn(writer, value);
+		}
+	}
 
 }
